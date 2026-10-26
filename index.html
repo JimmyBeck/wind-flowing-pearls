@@ -16,24 +16,30 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: 8px;
     }
 
-    /* 顶部控制栏 */
+    /* 顶部双行紧凑控制栏 */
     .hud {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: 6px;
+      gap: 5px;
       z-index: 10;
       background: rgba(16, 22, 28, 0.88);
       border: 1px solid rgba(190, 240, 238, 0.22);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
-      padding: 5px 12px;
-      border-radius: 999px;
+      padding: 6px 14px;
+      border-radius: 16px;
       max-width: 96vw;
+    }
+    .hud-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
     .hud-group {
       display: flex;
@@ -50,7 +56,7 @@
       border: none;
       color: rgba(215, 242, 240, 0.72);
       font-size: 12px;
-      padding: 4px 9px;
+      padding: 3px 9px;
       border-radius: 999px;
       cursor: pointer;
       transition: all 0.18s ease;
@@ -64,7 +70,7 @@
     }
     .divider {
       width: 1px;
-      height: 14px;
+      height: 13px;
       background: rgba(190, 240, 238, 0.18);
       margin: 0 3px;
     }
@@ -74,10 +80,10 @@
       display: flex;
       align-items: center;
       gap: 5px;
-      padding: 0 4px;
+      padding: 0 3px;
     }
     .slider-wrap input[type="range"] {
-      width: 68px;
+      width: 64px;
       accent-color: #b2f5ea;
       cursor: pointer;
     }
@@ -85,13 +91,13 @@
       color: #ffffff;
       font-size: 11px;
       font-variant-numeric: tabular-nums;
-      min-width: 28px;
+      min-width: 30px;
     }
 
     /* 严格锁定 9:16 竖屏画布容器 */
     .stage-container {
       position: relative;
-      height: calc(100vh - 92px);
+      height: calc(100vh - 108px);
       aspect-ratio: 9 / 16;
       max-width: 94vw;
       background: #000000;
@@ -163,47 +169,65 @@
 </head>
 <body>
   <div class="hud">
-    <div class="hud-group">
-      <span class="hud-label">造型</span>
-      <button class="hud-btn active" data-layout="hat">参考图流瀑</button>
-      <button class="hud-btn" data-layout="staggered">均匀错落</button>
-      <button class="hud-btn" data-layout="uniform">等长整齐</button>
+    <div class="hud-row">
+      <div class="hud-group">
+        <span class="hud-label">造型</span>
+        <button class="hud-btn active" data-layout="hat">参考图流瀑</button>
+        <button class="hud-btn" data-layout="staggered">均匀错落</button>
+        <button class="hud-btn" data-layout="uniform">等长整齐</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="hud-group">
+        <button class="hud-btn" id="backLayerBtn" title="开关后景半透明衬底珠链">后景深: 关</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="hud-group">
+        <span class="hud-label">打散</span>
+        <button class="hud-btn active" data-mode="fall">重力下坠</button>
+        <button class="hud-btn" data-mode="float">向上飘散</button>
+        <button class="hud-btn" data-mode="unbreakable">不断裂</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <button class="hud-btn" id="resetBtn">重置</button>
     </div>
 
-    <div class="divider"></div>
+    <div class="hud-row">
+      <div class="slider-wrap">
+        <span class="hud-label">微风</span>
+        <input type="range" id="windStrengthSlider" min="0" max="2.5" step="0.05" value="1.0" />
+        <span class="scale-val" id="windStrengthVal">1.0x</span>
+      </div>
 
-    <div class="hud-group">
-      <button class="hud-btn" id="backLayerBtn" title="开关第4项：后景半透明衬底珠链">后景深: 关</button>
+      <div class="divider"></div>
+
+      <div class="slider-wrap">
+        <span class="hud-label">鼠标力度</span>
+        <input type="range" id="mouseSensSlider" min="0.1" max="2.0" step="0.05" value="0.55" />
+        <span class="scale-val" id="mouseSensVal">0.55x</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="slider-wrap">
+        <span class="hud-label">密度</span>
+        <input type="range" id="chainCountSlider" min="6" max="40" step="1" value="16" />
+        <span class="scale-val" id="chainCountVal">16根</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="slider-wrap">
+        <span class="hud-label">珠子大小</span>
+        <input type="range" id="beadScaleSlider" min="0.15" max="2.5" step="0.05" value="1.0" />
+        <span class="scale-val" id="beadScaleVal">1.0x</span>
+      </div>
     </div>
-
-    <div class="divider"></div>
-
-    <div class="hud-group">
-      <span class="hud-label">打散</span>
-      <button class="hud-btn active" data-mode="fall">重力下坠</button>
-      <button class="hud-btn" data-mode="float">向上飘散</button>
-      <button class="hud-btn" data-mode="unbreakable">不断裂</button>
-    </div>
-
-    <div class="divider"></div>
-
-    <div class="slider-wrap">
-      <span class="hud-label">密度</span>
-      <input type="range" id="chainCountSlider" min="6" max="40" step="1" value="16" />
-      <span class="scale-val" id="chainCountVal">16根</span>
-    </div>
-
-    <div class="divider"></div>
-
-    <div class="slider-wrap">
-      <span class="hud-label">珠子大小</span>
-      <input type="range" id="beadScaleSlider" min="0.15" max="2.5" step="0.05" value="1.0" />
-      <span class="scale-val" id="beadScaleVal">1.0x</span>
-    </div>
-
-    <div class="divider"></div>
-
-    <button class="hud-btn" id="resetBtn">重置</button>
   </div>
 
   <div class="stage-container" id="stageContainer">
