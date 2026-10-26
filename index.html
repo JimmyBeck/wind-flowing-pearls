@@ -94,11 +94,11 @@
       min-width: 30px;
     }
 
-    /* 严格锁定 9:16 竖屏画布容器 */
+    /* 舒展竖屏画布容器 (3:4 比例，横向舒展透气，高度撑满) */
     .stage-container {
       position: relative;
       height: calc(100vh - 108px);
-      aspect-ratio: 9 / 16;
+      aspect-ratio: 3 / 4;
       max-width: 94vw;
       background: #000000;
       border: 1px solid rgba(255, 255, 255, 0.14);
@@ -162,7 +162,7 @@
       margin-top: 5px;
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 1050px) {
       .project-plaque { display: none; }
     }
   </style>
@@ -181,6 +181,15 @@
 
       <div class="hud-group">
         <button class="hud-btn" id="backLayerBtn" title="开关后景半透明衬底珠链">后景深: 关</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="hud-group">
+        <span class="hud-label">风向</span>
+        <button class="hud-btn active" data-wind="right" title="湖畔微风：自左向右吹拂">左风 ➔</button>
+        <button class="hud-btn" data-wind="left" title="湖畔微风：自右向左吹拂">右风 ⬅</button>
+        <button class="hud-btn" data-wind="ambient" title="自然微澜：多向交织散风">自然 ⇄</button>
       </div>
 
       <div class="divider"></div>
@@ -232,7 +241,7 @@
 
   <div class="stage-container" id="stageContainer">
     <canvas id="stage"></canvas>
-    <div class="ratio-badge">9 : 16</div>
+    <div class="ratio-badge">3 : 4</div>
   </div>
 
   <aside class="project-plaque" aria-label="项目介绍">
@@ -242,7 +251,7 @@
     <div class="plaque-hint">轻拂生波 · 疾掠散珠 · 双击复原</div>
   </aside>
 
-  <script src="crystal.js?v=2.1"></script>
-  <script src="main.js?v=2.1"></script>
+  <script src="crystal.js?v=2.2"></script>
+  <script src="main.js?v=2.2"></script>
 </body>
 </html>

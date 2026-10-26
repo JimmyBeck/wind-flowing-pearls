@@ -1,5 +1,5 @@
 /* =========================================================================
-   main.js - 风起流珠 (wind-flowing-pearls)：9:16 实体水晶珠帘主控与可配置参数
+   main.js - 风起流珠 (wind-flowing-pearls)：3:4 舒展竖屏水晶珠帘主控与可配置参数
    ========================================================================= */
 
 window.CONFIG = {
@@ -9,8 +9,11 @@ window.CONFIG = {
   breakMode: 'fall',          // 'fall': 重力下坠 | 'float': 向上飘散 | 'unbreakable': 只摆动不断裂
   beadScale: 1.0,             // 珠子整体大小缩放倍率 (0.15 ~ 2.5)
 
-  // 2. 自动微风与鼠标灵敏度 (v2 新增)
+  // 2. 自动微风与风向配置 (v2.2 湖畔柳枝微风模型)
   windStrength: 1.0,          // 自动微风强度 (0.0 ~ 2.5, 0 为完全无风)
+  windDirection: 'right',     // 主风向: 'right'(左风➔，自左向右) | 'left'(右风⬅，自右向左) | 'ambient'(自然微澜)
+  windBias: 0.42,             // 湖畔恒定倾斜偏度 (顺风倾角偏置，越往下端越自然斜垂)
+  windTurbulence: 0.15,       // 扰动杂散度 (越小整齐如湖风，越大越凌乱)
   mouseSensitivity: 0.55,     // 鼠标流体推力灵敏度 (0.1 ~ 2.0, 默认轻柔抚动无硬碰撞感)
 
   // 3. 物理引擎参数
@@ -121,10 +124,19 @@ class CrystalCurtainApp {
   }
 
   triggerGust(power = 0.85) {
+    const cfg = window.CONFIG;
+    let gustDir = 1;
+    if (cfg.windDirection === 'right') {
+      gustDir = 1;
+    } else if (cfg.windDirection === 'left') {
+      gustDir = -1;
+    } else {
+      gustDir = Math.random() > 0.25 ? 1 : -1;
+    }
     this.gusts.push({
       startTime: this.time,
       power: power,
-      dir: Math.random() > 0.25 ? 1 : -1
+      dir: gustDir
     });
     if (this.gusts.length > 4) this.gusts.shift();
   }
@@ -225,7 +237,7 @@ class CrystalCurtainApp {
 
   getColumnSpecs(cols, maxLen, mode) {
     const specs = [];
-    const marginX = 24;
+    const marginX = 28;
     const usableW = Math.max(80, this.width - marginX * 2);
     const baseSpacing = cols > 1 ? usableW / (cols - 1) : 0;
     const baseStartX = cols > 1 ? marginX : this.width / 2;
@@ -442,7 +454,17 @@ class CrystalCurtainApp {
       this.sound.chime(0.75);
     });
 
-    // 3. 打散模式切换
+    // 3. 风向模式切换 (v2.2 湖畔微风)
+    document.querySelectorAll('.hud-btn[data-wind]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.hud-btn[data-wind]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        window.CONFIG.windDirection = btn.dataset.wind;
+        this.sound.chime(0.7);
+      });
+    });
+
+    // 4. 打散模式切换
     document.querySelectorAll('.hud-btn[data-mode]').forEach((btn) => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.hud-btn[data-mode]').forEach(b => b.classList.remove('active'));
@@ -493,7 +515,7 @@ class CrystalCurtainApp {
   }
 
   /**
-   * 施加 wind-chimes 同款非同步 S 形行波微风与间歇清风涟漪
+   * 施加可控风向的湖畔柳枝微风行波与间歇清风涟漪
    */
   applyAutoBreeze(windStrength) {
     if (windStrength <= 0.01) return;
@@ -504,12 +526,35 @@ class CrystalCurtainApp {
       this.nextGustTime = t + 4.5 + Math.random() * 4.0;
     }
 
+    const cfg = window.CONFIG;
+    const dirMode = cfg.windDirection || 'right'; // 'right' | 'left' | 'ambient'
+    const totalCols = Math.max(1, this.chains.length);
+
     for (let c = 0; c < this.chains.length; c++) {
       const chain = this.chains[c];
       const nodes = chain.nodes;
       const len = nodes.length;
       const topY = nodes[0].originalY;
       const layerMul = chain.layer === 'back' ? 0.65 : 1.0;
+
+      // 顺风涟漪列延迟与主风向计算
+      let windDir = 1;
+      let colProgress = 0;
+      let colWaveDelay = 0;
+
+      if (dirMode === 'right') {
+        windDir = 1;
+        colProgress = c / Math.max(1, totalCols - 1);
+        colWaveDelay = colProgress * Math.PI * 1.6;
+      } else if (dirMode === 'left') {
+        windDir = -1;
+        colProgress = (totalCols - 1 - c) / Math.max(1, totalCols - 1);
+        colWaveDelay = colProgress * Math.PI * 1.6;
+      } else {
+        windDir = chain.dir;
+        colProgress = c / Math.max(1, totalCols - 1);
+        colWaveDelay = chain.colIdx * 0.26;
+      }
 
       for (let r = 1; r < len; r++) {
         const node = nodes[r];
@@ -518,20 +563,36 @@ class CrystalCurtainApp {
         // 深度比例 reach：越往下摆幅越舒展
         const reach = Math.min(1.25, (node.originalY - topY) / 320);
 
-        // 1. 单链双谐波非同步 S 形柳条波
-        const w1 = Math.sin(t * chain.freq - r * chain.delayStep + chain.phase) * chain.ampMul;
-        const w2 = Math.sin(t * chain.freq2 - r * chain.delayStep * 1.35 + chain.phase * 1.7) * chain.ampMul * 0.40;
-        let windX = (w1 + w2) * chain.dir * 0.62;
+        let windX = 0;
 
-        // 2. 横跨整幅帘幕的慢速行波底风
-        windX += Math.sin(t * 0.85 - chain.colIdx * 0.26 - r * 0.12) * 0.48;
+        if (dirMode === 'ambient') {
+          // 四散微澜模式：保留多向交织散风
+          const w1 = Math.sin(t * chain.freq - r * chain.delayStep + chain.phase) * chain.ampMul;
+          const w2 = Math.sin(t * chain.freq2 - r * chain.delayStep * 1.35 + chain.phase * 1.7) * chain.ampMul * 0.40;
+          windX = (w1 + w2) * chain.dir * 0.62 + Math.sin(t * 0.85 - chain.colIdx * 0.26 - r * 0.12) * 0.48;
+        } else {
+          // 湖畔微风模式：柳波轻漾、顺向倾斜、波浪有序由迎风面传递向下风面
+          // 1. 恒定顺风轻倾角（底风偏角，随深度自然舒展）
+          const steadyBias = windDir * (cfg.windBias || 0.42) * 1.75;
 
-        // 3. 间歇阵风涟漪脉冲 (自上而下、从左至右传导)
+          // 2. 顺风双谐波起伏行波（全帘同向起伏，带流体顺向列延迟）
+          const turb = cfg.windTurbulence || 0.15;
+          const w1 = Math.sin(t * (chain.freq * 0.92) - r * (chain.delayStep * 0.9) - colWaveDelay + chain.phase * turb);
+          const w2 = Math.sin(t * (chain.freq2 * 0.85) - r * (chain.delayStep * 1.2) - colWaveDelay * 1.25) * 0.35;
+          const harmonicWave = (w1 + w2) * 0.72 * windDir;
+
+          // 3. 整幅帘幕顺风慢澜
+          const broadWave = Math.sin(t * 0.62 - colWaveDelay - r * 0.08) * 0.38 * windDir;
+
+          windX = steadyBias + harmonicWave + broadWave;
+        }
+
+        // 间歇阵风涟漪脉冲 (沿风向从迎风列滑向下风列)
         let gustX = 0;
         for (let g = 0; g < this.gusts.length; g++) {
           const gust = this.gusts[g];
           const dt = t - gust.startTime;
-          const travelDelay = r * 0.055 + (chain.colIdx % 20) * 0.045;
+          const travelDelay = r * 0.045 + (dirMode === 'ambient' ? (chain.colIdx % 20) * 0.045 : colProgress * 0.68);
           const localDt = dt - travelDelay;
           if (localDt > 0 && localDt < 2.2) {
             const pulse = Math.exp(-Math.pow((localDt - 0.4) / 0.32, 2)) * gust.power;
