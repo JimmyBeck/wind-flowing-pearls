@@ -568,7 +568,7 @@ class CrystalCurtainApp {
         if (speed > 44 / Math.sqrt(sens) && cfg.breakMode !== 'unbreakable') {
           this.breakNearby(this.pointer.x, this.pointer.y, 46);
         }
-      } else if (speed > 0.35) {
+      } else if (speed > 0.15) {
         // 仅当光标实际移动时才产生流体尾流，静止时不硬顶珠子
         const r = cfg.mouseRadius;
         const rSq = r * r;
@@ -589,13 +589,14 @@ class CrystalCurtainApp {
           if (dSq < rSq) {
             const dist = Math.sqrt(dSq) || 1;
             const layerFactor = node.layer === 'back' ? 0.65 : 1.0;
-            // 平滑指数衰减 (1 - d/r)^1.45
-            const falloff = Math.pow(1 - dist / r, 1.45) / Math.sqrt(node.mass) * layerFactor;
+            // 平滑指数衰减 (1 - d/r)^1.35
+            const falloff = Math.pow(1 - dist / r, 1.35) / Math.sqrt(node.mass) * layerFactor;
 
-            // 速度耦合的轻柔拨开力 + 沿光标运动方向的流体尾流拖拽
-            const gentlePush = Math.min(speed * 0.14, 2.2) * sens;
-            node.x += ((dx / dist) * gentlePush + this.pointer.vx * 0.28 * sens) * falloff;
-            node.y += ((dy / dist) * gentlePush * 0.6 + this.pointer.vy * 0.22 * sens) * falloff;
+            // 基础拨开力 + 速度流体尾流 (直接由 mouseSensitivity 调谐强弱)
+            const basePush = (1 - dist / r) * 3.6 * sens;
+            const flowPush = Math.min(speed * 0.35, 6.5) * sens;
+            node.x += ((dx / dist) * (basePush + flowPush) + this.pointer.vx * 0.32 * sens) * falloff;
+            node.y += ((dy / dist) * (basePush * 0.4 + flowPush * 0.5) + this.pointer.vy * 0.22 * sens) * falloff;
             touched++;
 
             if (speed > effectiveBreakSpeed && dist < 34) {
