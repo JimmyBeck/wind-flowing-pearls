@@ -75,7 +75,7 @@ class CrystalSound {
 class CrystalCurtainApp {
   constructor() {
     this.canvas = document.getElementById('stage');
-    this.ctx = this.canvas.getContext('2d', { alpha: false });
+    this.ctx = this.canvas.getContext('2d');
     this.sprites = new window.CrystalSprites();
     this.sound = new CrystalSound();
 
@@ -107,9 +107,16 @@ class CrystalCurtainApp {
   }
 
   resize() {
+    this.stageContainer = document.getElementById('stageContainer');
+    const containerRect = this.stageContainer ? this.stageContainer.getBoundingClientRect() : this.canvas.getBoundingClientRect();
+    this.frameWidth = containerRect.width;
+    this.frameHeight = containerRect.height;
+
     const rect = this.canvas.getBoundingClientRect();
     this.width = rect.width;
     this.height = rect.height;
+    this.bufferX = Math.max(0, Math.round((this.width - this.frameWidth) / 2));
+
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
@@ -237,10 +244,12 @@ class CrystalCurtainApp {
 
   getColumnSpecs(cols, maxLen, mode) {
     const specs = [];
+    const frameW = this.frameWidth || this.width;
+    const bufX = this.bufferX || 0;
     const marginX = 28;
-    const usableW = Math.max(80, this.width - marginX * 2);
+    const usableW = Math.max(80, frameW - marginX * 2);
     const baseSpacing = cols > 1 ? usableW / (cols - 1) : 0;
-    const baseStartX = cols > 1 ? marginX : this.width / 2;
+    const baseStartX = bufX + (cols > 1 ? marginX : frameW / 2);
 
     const hatLengthRatios = [
       0.92, 0.76, 0.96, 0.62, 0.86, 0.48, 0.78, 0.34,
@@ -285,7 +294,8 @@ class CrystalCurtainApp {
 
     const cfg = window.CONFIG;
     const cols = Math.max(4, Math.min(45, cfg.chainCount));
-    const maxLen = Math.max(180, this.height - 86);
+    const baseH = this.frameHeight || this.height;
+    const maxLen = Math.max(160, baseH - 165);
 
     const frontSpecs = this.getColumnSpecs(cols, maxLen, cfg.layoutMode);
 
@@ -511,6 +521,33 @@ class CrystalCurtainApp {
       scaleVal.textContent = val.toFixed(2).replace(/\.00$/, '.0') + 'x';
     });
 
+    // 8. 拍摄纯净模式切换与快捷键支持 (H / Esc)
+    const studioBtn = document.getElementById('studioModeBtn');
+    if (studioBtn) {
+      studioBtn.addEventListener('click', () => {
+        document.body.classList.toggle('studio-mode');
+        this.sound.chime(0.65);
+      });
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
+      if (e.key === 'h' || e.key === 'H') {
+        document.body.classList.toggle('studio-mode');
+        this.sound.chime(0.65);
+      } else if (e.key === 'Escape' && document.body.classList.contains('studio-mode')) {
+        document.body.classList.remove('studio-mode');
+        this.sound.chime(0.65);
+      }
+    });
+
+    window.addEventListener('pointerdown', (e) => {
+      if (document.body.classList.contains('studio-mode') && e.clientY < 50) {
+        document.body.classList.remove('studio-mode');
+        this.sound.chime(0.65);
+      }
+    });
+
     document.getElementById('resetBtn').addEventListener('click', () => this.restoreCurtain());
   }
 
@@ -696,9 +733,8 @@ class CrystalCurtainApp {
       if (this.particles[i].life <= 0) this.particles.splice(i, 1);
     }
 
-    // 5. 渲染纯黑背景 (#000000)
-    this.ctx.fillStyle = '#000000';
-    this.ctx.fillRect(0, 0, this.width, this.height);
+    // 5. 清除上一帧画布 (透明清除，使背景与外框自然分层，珠链飘动自然溢出画框)
+    this.ctx.clearRect(0, 0, this.width, this.height);
 
     // 6. 渲染珠链银丝连接线
     this.ctx.lineWidth = Math.max(0.32, Math.min(1.0, 0.8 * Math.sqrt(globalScale)));
