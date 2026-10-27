@@ -3,8 +3,9 @@
    ========================================================================= */
 
 window.CONFIG = {
-  // 1. 造型与景深开关
+  // 1. 造型、画幅与景深开关
   layoutMode: 'hat',          // 'hat': 参考图帽檐流瀑 | 'staggered': 均匀错落 | 'uniform': 等长整齐
+  aspectRatio: '3:4',         // 录制画幅比例: '3:4' | '9:16' | '4:5' | '1:1' | '16:9' | 'full'
   enableBackLayer: false,     // 是否开启后景半透明衬底珠链
   breakMode: 'fall',          // 'fall': 重力下坠 | 'float': 向上飘散 | 'unbreakable': 只摆动不断裂
   beadScale: 1.0,             // 珠子整体大小缩放倍率 (0.15 ~ 2.5)
@@ -123,6 +124,34 @@ class CrystalCurtainApp {
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
     this.buildCurtain();
+  }
+
+  setAspectRatio(ratioKey) {
+    const stage = document.getElementById('stageContainer');
+    const badge = document.getElementById('ratioBadge');
+    if (!stage) return;
+
+    window.CONFIG.aspectRatio = ratioKey;
+
+    if (ratioKey === 'full') {
+      stage.style.aspectRatio = 'auto';
+      stage.style.width = '90vw';
+      stage.style.height = 'calc(100vh - 108px)';
+      if (badge) badge.textContent = '铺满';
+    } else {
+      const parts = ratioKey.split(':');
+      const rw = parseFloat(parts[0]);
+      const rh = parseFloat(parts[1]);
+      const rVal = rw / rh;
+
+      stage.style.width = 'auto';
+      stage.style.aspectRatio = `${rw} / ${rh}`;
+      stage.style.height = `min(calc(100vh - 108px), calc(90vw / ${rVal.toFixed(4)}))`;
+      if (badge) badge.textContent = `${rw} : ${rh}`;
+    }
+
+    this.resize();
+    this.sound.chime(0.7);
   }
 
   seededRand(seed) {
@@ -295,7 +324,7 @@ class CrystalCurtainApp {
     const cfg = window.CONFIG;
     const cols = Math.max(4, Math.min(45, cfg.chainCount));
     const baseH = this.frameHeight || this.height;
-    const maxLen = Math.max(160, baseH - 165);
+    const maxLen = Math.max(140, Math.round(baseH * 0.78 - 30));
 
     const frontSpecs = this.getColumnSpecs(cols, maxLen, cfg.layoutMode);
 
@@ -527,6 +556,14 @@ class CrystalCurtainApp {
       studioBtn.addEventListener('click', () => {
         document.body.classList.toggle('studio-mode');
         this.sound.chime(0.65);
+      });
+    }
+
+    // 9. 画幅比例切换 (3:4, 9:16, 4:5, 1:1, 16:9, full)
+    const aspectSelect = document.getElementById('aspectRatioSelect');
+    if (aspectSelect) {
+      aspectSelect.addEventListener('change', (e) => {
+        this.setAspectRatio(e.target.value);
       });
     }
 

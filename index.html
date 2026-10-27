@@ -94,17 +94,38 @@
       min-width: 30px;
     }
 
-    /* 拍摄取景画框 (3:4 比例，允许起风与散落微粒自然向外舒展溢出) */
+    /* 下拉选择框 */
+    .hud-select {
+      background: rgba(18, 26, 32, 0.92);
+      border: 1px solid rgba(190, 240, 238, 0.28);
+      color: rgba(220, 248, 245, 0.9);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.18s ease;
+    }
+    .hud-select:hover {
+      border-color: rgba(190, 240, 238, 0.55);
+      color: #ffffff;
+      background: rgba(26, 38, 46, 0.96);
+    }
+    .hud-select option {
+      background: #0d151a;
+      color: #e2f7f5;
+    }
+
+    /* 拍摄舞台容器 (自适应多种比例，无边框设计，允许起风与散落微粒自然向外舒展溢出) */
     .stage-container {
       position: relative;
-      height: calc(100vh - 108px);
+      height: min(calc(100vh - 108px), calc(90vw / 0.75));
       aspect-ratio: 3 / 4;
       max-width: 90vw;
-      background: #000000;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 6px;
+      max-height: calc(100vh - 108px);
+      background: transparent;
+      border: none;
       overflow: visible; /* 允许珠链与散落微粒溢出边界完整呈现，绝不硬切边 */
-      box-shadow: 0 0 40px rgba(160, 240, 230, 0.05);
     }
     canvas {
       position: absolute;
@@ -194,6 +215,20 @@
       <div class="divider"></div>
 
       <div class="hud-group">
+        <span class="hud-label">比例</span>
+        <select class="hud-select" id="aspectRatioSelect" title="切换录制画布画幅比例">
+          <option value="3:4" selected>3:4 竖屏</option>
+          <option value="9:16">9:16 满屏</option>
+          <option value="4:5">4:5 社交</option>
+          <option value="1:1">1:1 方形</option>
+          <option value="16:9">16:9 宽屏</option>
+          <option value="full">铺满窗口</option>
+        </select>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="hud-group">
         <button class="hud-btn" id="backLayerBtn" title="开关后景半透明衬底珠链">后景深: 关</button>
       </div>
 
@@ -259,7 +294,7 @@
 
   <div class="stage-container" id="stageContainer">
     <canvas id="stage"></canvas>
-    <div class="ratio-badge">3 : 4</div>
+    <div class="ratio-badge" id="ratioBadge">3 : 4</div>
   </div>
 
   <aside class="project-plaque" aria-label="项目介绍">
@@ -269,7 +304,7 @@
     <div class="plaque-hint">轻拂生波 · 疾掠散珠 · 双击复原 · 按 H 纯净拍摄</div>
   </aside>
 
-  <script src="crystal.js?v=2.3"></script>
-  <script src="main.js?v=2.3"></script>
+  <script src="crystal.js?v=2.5"></script>
+  <script src="main.js?v=2.5"></script>
 </body>
 </html>
