@@ -25,6 +25,7 @@ window.CONFIG = {
 
   // 4. 鼠标风场半径与断裂阈值
   mouseRadius: 105,           // 鼠标气流作用半径 (px)
+  palmRadius: 120,            // 按住撩帘手掌跨度 (px, 40 ~ 260 可调)
   breakThreshold: 76,         // 珠链拉断基础临界距离 (px)
   shakeBreakSpeed: 52,        // 快速划过打散的基础速度阈值
   grabDistance: 32,           // 拖拽抓取判定半径 (px)
@@ -97,6 +98,10 @@ class CrystalCurtainApp {
     this.pointer = {
       x: -1000, y: -1000,
       oldX: -1000, oldY: -1000,
+      downX: -1000, downY: -1000,
+      downTime: 0,
+      dragged: false,
+      inCurtain: false,
       vx: 0, vy: 0,
       active: false,
       isDown: false,
@@ -430,6 +435,12 @@ class CrystalCurtainApp {
       this.pointer.x = e.clientX - rect.left;
       this.pointer.y = e.clientY - rect.top;
       this.pointer.active = true;
+      if (this.pointer.isDown && !this.pointer.dragged) {
+        const dMove = Math.hypot(this.pointer.x - this.pointer.downX, this.pointer.y - this.pointer.downY);
+        if (dMove > 6) {
+          this.pointer.dragged = true;
+        }
+      }
     }, { passive: true });
 
     this.canvas.addEventListener('pointerdown', (e) => {
@@ -438,12 +449,17 @@ class CrystalCurtainApp {
       this.pointer.y = e.clientY - rect.top;
       this.pointer.oldX = this.pointer.x;
       this.pointer.oldY = this.pointer.y;
+      this.pointer.downX = this.pointer.x;
+      this.pointer.downY = this.pointer.y;
+      this.pointer.downTime = performance.now();
+      this.pointer.dragged = false;
       this.pointer.active = true;
       this.pointer.isDown = true;
 
-      // 精确单珠抓取阈值 (20px，点击单珠时单独抓取把玩，否则进入手掌碰撞体撩帘)
+      // 判定落点是否处于门帘物理接触区 (35px 判定范围覆盖链间空隙)
+      let inCurtain = false;
       let closest = null;
-      let minDistSq = 20 * 20;
+      let minDistSq = 9 * 9;
 
       for (let i = 0; i < this.allNodes.length; i++) {
         const node = this.allNodes[i];
@@ -451,11 +467,15 @@ class CrystalCurtainApp {
         const dx = node.x - this.pointer.x;
         const dy = node.y - this.pointer.y;
         const dSq = dx * dx + dy * dy;
+        if (dSq < 35 * 35) {
+          inCurtain = true;
+        }
         if (dSq < minDistSq) {
           minDistSq = dSq;
           closest = node;
         }
       }
+      this.pointer.inCurtain = inCurtain;
 
       if (closest) {
         this.pointer.grabbedNode = closest;
@@ -470,17 +490,13 @@ class CrystalCurtainApp {
         this.pointer.grabbedNode = null;
       }
       this.pointer.isDown = false;
+      this.pointer.dragged = false;
     };
 
     window.addEventListener('pointerup', handlePointerUp, { passive: true });
     window.addEventListener('pointercancel', handlePointerUp, { passive: true });
     window.addEventListener('blur', handlePointerUp, { passive: true });
     document.addEventListener('mouseleave', handlePointerUp, { passive: true });
-
-    window.addEventListener('dblclick', (e) => {
-      if (e.target.closest('.hud')) return;
-      this.restoreCurtain();
-    });
 
     // 1. 排布造型切换
     document.querySelectorAll('.hud-btn[data-layout]').forEach((btn) => {
@@ -540,6 +556,17 @@ class CrystalCurtainApp {
       window.CONFIG.mouseSensitivity = val;
       mouseSensVal.textContent = val.toFixed(2).replace(/\.00$/, '.0') + 'x';
     });
+
+    // 5.5. 撩帘跨度滑块 (40px ~ 260px)
+    const palmSlider = document.getElementById('palmRadiusSlider');
+    const palmVal = document.getElementById('palmRadiusVal');
+    if (palmSlider && palmVal) {
+      palmSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        window.CONFIG.palmRadius = val;
+        palmVal.textContent = val + 'px';
+      });
+    }
 
     // 6. 链条密度滑块 (6 ~ 40 根)
     const chainSlider = document.getElementById('chainCountSlider');
@@ -696,53 +723,67 @@ class CrystalCurtainApp {
   resolvePalmCollider() {
     if (!this.pointer.active || this.colliderRadius < 4 || this.pointer.grabbedNode) return;
     const Rx = this.colliderRadius;
-    const Ry = this.colliderRadius * 0.85;
+    // 纵向厚度做物理抑制：避免等比膨胀变成巨大圆球顶破门帘，让横向推开充分舒展，纵向平滑微拱
+    const Ry = Math.min(105, Rx * 0.72);
     const px = this.pointer.x, py = this.pointer.y;
-    const projFactor = 0.30; // 柔性 PBD 依从度，避免瞬发刚性冲击拉断银丝
+    const projFactor = 0.28; // 柔性 PBD 依从度，避免瞬发刚性冲击拉断银丝
+    const taperH = Math.max(140, Rx * 0.85); // 顺滑垂帘下落高度
 
     for (let i = 0; i < this.allNodes.length; i++) {
       const node = this.allNodes[i];
       if (node.pinned || node.isGrabbed || node.alpha <= 0.05) continue;
 
       const dx = node.x - px;
-      if (dx > Rx || dx < -Rx) continue;
       const dy = node.y - py;
-      if (dy > Ry || dy < -Ry) continue;
 
-      const ndistSq = (dx * dx) / (Rx * Rx) + (dy * dy) / (Ry * Ry);
-      if (ndistSq < 1.0) {
-        const ndist = Math.sqrt(ndistSq) || 0.001;
-        const pen = 1.0 - ndist;
-
-        let nx = (dx / (Rx * Rx)) / ndist;
-        let ny = (dy / (Ry * Ry)) / ndist;
-
-        // 若处于光标水平线下方 (dy >= 0)，严禁向下推拉挂链（避免逆着天花板拉扯撕断珠链），转为水平推开门帘两侧
-        if (dy >= 0) {
-          ny = 0;
-          nx = dx >= 0 ? 1 : -1;
-        } else {
-          // 水平线上方：圆润穹顶支撑，边缘法向切角配合重力涌现自然顺滑脱落
+      if (dy < 0) {
+        // 上半区：圆润穹顶支撑，边缘法向切角配合重力涌现自然顺滑脱落
+        if (dy < -Ry) continue;
+        const ndistSq = (dx * dx) / (Rx * Rx) + (dy * dy) / (Ry * Ry);
+        if (ndistSq < 1.0) {
+          const ndist = Math.sqrt(ndistSq) || 0.001;
+          const pen = 1.0 - ndist;
+          let nx = (dx / (Rx * Rx)) / ndist;
+          let ny = (dy / (Ry * Ry)) / ndist;
           const mag = Math.hypot(nx, ny) || 1.0;
           nx /= mag;
           ny /= mag;
+          const shiftX = nx * (pen * Rx) * projFactor;
+          const shiftY = ny * (pen * Ry) * projFactor;
+          node.x += shiftX;
+          node.y += shiftY;
         }
-
-        node.x += nx * (pen * Rx) * projFactor;
-        node.y += ny * (pen * Ry) * projFactor;
+      } else {
+        // 下半区：手臂/身侧自然顺滑梯形展帘，纵向平滑衰减至底端零剪切，彻底杜绝下端硬截断拉扯
+        if (dy >= taperH) continue;
+        const taperRatio = dy / taperH; // 0.0 ~ 1.0
+        const currentHalfWidth = Rx * (1.0 - taperRatio * 0.45);
+        const absX = Math.abs(dx);
+        if (absX < currentHalfWidth) {
+          // 底端平滑淡出：靠近 taperH 处推力自然衰减到 0，杜绝阶跃式剪切撕断珠链
+          const pen = (currentHalfWidth - absX) * (1.0 - taperRatio * taperRatio);
+          // 滞回防剪切：挥动撩帘时保持迎风面一致性，杜绝光标穿透链条瞬间零点符号突跳撕断同一根链
+          let dir = dx >= 0 ? 1 : -1;
+          const pvx = this.pointer.vx || 0;
+          if (pvx > 1.2) {
+            dir = dx > -currentHalfWidth * 0.45 ? 1 : -1;
+          } else if (pvx < -1.2) {
+            dir = dx < currentHalfWidth * 0.45 ? -1 : 1;
+          }
+          const shiftX = dir * pen * projFactor;
+          node.x += shiftX;
+        }
       }
     }
   }
 
   /**
    * 局域相邻链软间隙防穿模松弛 (Local Inter-chain Relaxation)
-   * 仅在光标接触区内对发生干涉的相邻两根链条执行对称间隙维护，防止挤压交叉穿模，严禁全屏级联
+   * 仅在发生挤压干涉的相邻两根链条间执行对称间隙维护，防止交叉穿模，远端未接触链自然零位移
    */
   resolveInterChain() {
     if (!this.pointer.active || this.colliderRadius < 4) return;
     const minGap = 10;
-    const px = this.pointer.x;
-    const bound = this.colliderRadius + 30;
 
     for (let c = 0; c < this.chains.length - 1; c++) {
       const c1 = this.chains[c].nodes;
@@ -753,12 +794,10 @@ class CrystalCurtainApp {
         const n1 = c1[r], n2 = c2[r];
         if (n1.pinned || n2.pinned) continue;
         if (n2.x < n1.x + minGap) {
-          // 仅在接近光标接触区时做相邻微调
-          if (Math.abs(n1.x - px) < bound || Math.abs(n2.x - px) < bound) {
-            const overlap = (n1.x + minGap) - n2.x;
-            n1.x -= overlap * 0.4;
-            n2.x += overlap * 0.4;
-          }
+          const overlap = (n1.x + minGap) - n2.x;
+          const shift = overlap * 0.5;
+          n1.x -= shift;
+          n2.x += shift;
         }
       }
     }
@@ -770,10 +809,21 @@ class CrystalCurtainApp {
     this.time += 0.016;
 
     // 平滑自适应手掌物理半径（按住时平滑充气展开，松开时平滑泄气收回，杜绝瞬间冲击波拉断珠链）
-    const targetRadius = (this.pointer.active && this.pointer.isDown && !this.pointer.grabbedNode)
-      ? Math.max(90, cfg.mouseRadius * 1.15)
+    // 激活规则：在门帘内按住，或开始拖拽划动(dragged)，手掌平滑展开；在空白处静止按住时目标半径恒为 0
+    const isHoldOrDrag = this.pointer.isDown && !this.pointer.grabbedNode && (
+      this.pointer.dragged || this.pointer.inCurtain
+    );
+    const targetRadius = (this.pointer.active && isHoldOrDrag)
+      ? (cfg.palmRadius || 120)
       : 0;
-    this.colliderRadius += (targetRadius - this.colliderRadius) * 0.22;
+
+    const diff = targetRadius - this.colliderRadius;
+    if (diff > 0) {
+      // 展开限幅：每帧最多递增 6px，平稳优雅充气展开，杜绝瞬间激波
+      this.colliderRadius += Math.min(diff * 0.22, 6.0);
+    } else {
+      this.colliderRadius += diff * 0.28;
+    }
     if (this.colliderRadius < 1.0) this.colliderRadius = 0;
 
     // 1. 施加自动微风行波
@@ -855,6 +905,40 @@ class CrystalCurtainApp {
       }
       this.resolvePalmCollider();
       this.resolveInterChain();
+    }
+
+    // 3.5. 帧尾静态接触吸能 (Post-Solve Contact Damping)
+    // 仅当光标处于静止按住状态(speed <= 0.12)时，对贴在手掌边界上的珠子消除残余相对速度，彻底杜绝自激微振
+    if (this.pointer.active && this.pointer.isDown && this.colliderRadius > 4) {
+      const pSpeed = Math.hypot(this.pointer.vx, this.pointer.vy);
+      if (pSpeed <= 0.12) {
+        const Rx = this.colliderRadius;
+        const Ry = Math.min(105, Rx * 0.72);
+        const px = this.pointer.x, py = this.pointer.y;
+        for (let i = 0; i < this.allNodes.length; i++) {
+          const node = this.allNodes[i];
+          if (node.pinned || node.isGrabbed || node.alpha <= 0.05) continue;
+          const dx = node.x - px;
+          const dy = node.y - py;
+          if (dy < 0) {
+            if (dy < -Ry) continue;
+            const ndistSq = (dx * dx) / (Rx * Rx) + (dy * dy) / (Ry * Ry);
+            if (ndistSq < 1.05) {
+              node.oldX = node.x;
+              node.oldY = node.y;
+            }
+          } else {
+            const taperH = Math.max(140, Rx * 0.85);
+            if (dy <= taperH) {
+              const currentHalfWidth = Rx * (1.0 - (dy / taperH) * 0.45);
+              if (Math.abs(dx) <= currentHalfWidth + 2) {
+                node.oldX = node.x;
+                node.oldY = node.y;
+              }
+            }
+          }
+        }
+      }
     }
 
     // 4. 散落微粒更新

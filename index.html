@@ -83,7 +83,7 @@
       padding: 0 3px;
     }
     .slider-wrap input[type="range"] {
-      width: 64px;
+      width: 58px;
       accent-color: #b2f5ea;
       cursor: pointer;
     }
@@ -277,6 +277,14 @@
       <div class="divider"></div>
 
       <div class="slider-wrap">
+        <span class="hud-label">撩帘跨度</span>
+        <input type="range" id="palmRadiusSlider" min="40" max="260" step="5" value="120" />
+        <span class="scale-val" id="palmRadiusVal">120px</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="slider-wrap">
         <span class="hud-label">密度</span>
         <input type="range" id="chainCountSlider" min="6" max="40" step="1" value="16" />
         <span class="scale-val" id="chainCountVal">16根</span>
@@ -304,7 +312,7 @@
     <div class="plaque-hint">轻拂生波 · 撩帘悬停 · 疾掠散珠 · 按 H 纯净拍摄</div>
   </aside>
 
-  <script src="crystal.js?v=2.9"></script>
-  <script src="main.js?v=2.9"></script>
+  <script src="crystal.js?v=3.2"></script>
+  <script src="main.js?v=3.2"></script>
 </body>
 </html>
